@@ -150,6 +150,20 @@ exports.activate = function (raw_operators, opts) {
     var filter = new Filter(raw_operators);
     var operators = filter.operators();
 
+    // Take the most detailed part of the narrow to use as the title.
+    // If the operator is something other than "stream", "topic", or
+    // "is", we shouldn't update the narrow title
+    if (filter.has_operator("stream")) {
+        if (filter.has_operator("topic")) {
+            page_params.narrow_title = operators[1].operand;
+        } else {
+            page_params.narrow_title = operators[0].operand;
+        }
+    } else if (filter.has_operator("is")) {
+        page_params.narrow_title = operators[0].operand;
+    }
+    notifications.redraw_title();
+
     blueslip.debug("Narrowed", {operators: _.map(operators,
                                                  function (e) { return e.operator; }),
                                 trigger: opts ? opts.trigger : undefined,
@@ -476,6 +490,9 @@ exports.deactivate = function () {
     compose_fade.update_message_list();
 
     $(document).trigger($.Event('narrow_deactivated.zulip', {msg_list: current_msg_list}));
+
+    page_params.narrow_title = "home";
+    notifications.redraw_title();
 
     unnarrow_times.initial_core_time = new Date();
     setTimeout(function () {
