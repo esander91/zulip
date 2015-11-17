@@ -10,10 +10,10 @@ worry about setting up SSL certificates and an authentication mechanism.
 
 Recommended requirements:
 
-* Server running Ubuntu Precise or Debian Wheezy
+* Server running Ubuntu Trusty
 * At least 2 CPUs for production use with 100+ users
-* At least 4GB of RAM for production use with 100+ users.  We strongly
-  recommend against installing with less than 2GB of RAM, as you will
+* At least 4GB of RAM for production use with 100+ users.  We **strongly
+  recommend against installing with less than 2GB of RAM**, as you will
   likely experience OOM issues.  In the future we expect Zulip's RAM
   requirements to decrease to support smaller installations (see
   https://github.com/zulip/zulip/issues/32).
@@ -114,7 +114,7 @@ The `ADMIN_DOMAIN` realm is by default configured with the following settings:
 * `mandatory_topics=False`: Users are not required to specify a topic when sending messages.
 
 If you would like to change these settings, you can do so using the
-following process as the zulip user:
+Django management python shell (as the zulip user):
 
 ```
 cd /home/zulip/deployments/current
@@ -127,7 +127,11 @@ r.save() # save to the database
 
 If you realize you set `ADMIN_DOMAIN` wrong, in addition to fixing the
 value in settings.py, you will also want to do a similar manage.py
-process to set `r.domain = newexample.com`.
+process to set `r.domain = "newexample.com"`.  If you've already
+changed `ADMIN_DOMAIN` in settings.py, you can use
+`Realm.objects.all()` in the management shell to find the list of
+realms and pass the domain of the realm that is not "zulip.com" to
+`get_realm`.
 
 Depending what authentication backend you're planning to use, you will
 need to do some additional setup documented in the `settings.py` template:
@@ -231,8 +235,11 @@ problems and how to resolve them:
   service nginx restart
   ```
 
-If you run into additional problems, [please report them](https://github.com/zulip/zulip/issues) so that we can
-update these lists!
+If you run into additional problems, [please report
+them](https://github.com/zulip/zulip/issues) so that we can update
+these lists!  The Zulip installation scripts logs its full output to
+`/var/log/zulip/install.log`, so please include the context for any
+tracebacks from that log.
 
 
 Making your Zulip instance awesome
@@ -328,25 +335,58 @@ everything anyone might want to know about running Zulip in
 production.
 
 
-Maintaining Zulip in production
-===============================
+Maintaining and upgrading Zulip in production
+=============================================
 
-* To upgrade to a new version, download the appropriate release
-  tarball from https://www.zulip.com/dist/releases/ to a path readable
-  by the zulip user (e.g. /home/zulip), and then run as root:
+We recommend reading this entire section before doing your first
+upgrade.
+
+* To upgrade to a new version of the zulip server, download the
+  appropriate release tarball from
+  https://www.zulip.com/dist/releases/ to a path readable by the zulip
+  user (e.g. /home/zulip), and then run as root:
   ```
   /home/zulip/deployments/current/scripts/upgrade-zulip zulip-server-VERSION.tar.gz
   ```
+  Be sure to download to a path readable by the Zulip user (see
+  https://github.com/zulip/zulip/issues/208 for details on this
+  issue) but then run the upgrade as root.
 
   The upgrade process will shut down the service, run `apt-get
-  upgrade` and any database migrations, and then bring the service
-  back up.  This will result in some brief downtime for the service,
-  which should be under 30 seconds unless there is an expensive
-  transition involved.  Unless you have tested the upgrade in advance,
-  we recommend doing upgrades at off hours.
+  upgrade`, a puppet apply, and any database migrations, and then
+  bring the service back up.  This will result in some brief downtime
+  for the service, which should be under 30 seconds unless there is an
+  expensive transition involved.  Unless you have tested the upgrade
+  in advance, we recommend doing upgrades at off hours.
 
   You can create your own release tarballs from a copy of zulip.git
   repository using `tools/build-release-tarball`.
+
+* **Warning**: If you have modified configuration files installed by
+  Zulip (e.g. the nginx configuration), the Zulip upgrade process will
+  overwrite your configuration when it does the `puppet apply`.  You
+  can test whether this will happen assuming no upstream changes to
+  the configuration using `scripts/zulip-puppet-apply` (without the
+  `-f` option), which will do a test puppet run and output and changes
+  it would make.  Using this list, you can save a copy of any files
+  that you've modified, do the upgrade, and then restore your
+  configuration.  If you need to do this, please report the issue so
+  that we can make the Zulip puppet configuration flexible enough to
+  handle your setup.
+
+* The Zulip upgrade script automatically logs output to
+  /var/log/zulip/upgrade.log; please use those logs to include output
+  that shows all errors in any bug reports.
+
+* The Zulip upgrade process works by creating a new deployment under
+  /home/zulip/deployments/ containing a complete copy of the Zulip
+  server code, and then moving the symlinks at
+  `/home/zulip/deployments/current` and /root/zulip` as part of the
+  upgrade process.  This means that if the new version isn't working,
+  you can quickly downgrade to the old version by using
+  `/home/zulip/deployments/<date>/scripts/restart-server` to return to
+  a previous version that you've deployed (the version is specified
+  via the path to the copy of `restart-server` you call).
 
 * To update your settings, simply edit `/etc/zulip/settings.py` and then
   run `/home/zulip/deployments/current/scripts/restart-server` to
@@ -357,10 +397,10 @@ Maintaining Zulip in production
   security patches.
 
 * To use the Zulip API with your Zulip server, you will need to use the
-  API endpoint of e.g. `https://zulip.yourdomain.net/api`.  Our Python
+  API endpoint of e.g. `https://zulip.example.com/api`.  Our Python
   API example scripts support this via the
-  `--site=https://zulip.yourdomain.net` argument.  The API bindings
-  support it via putting `site=https://zulip.yourdomain.net` in your
+  `--site=https://zulip.example.com` argument.  The API bindings
+  support it via putting `site=https://zulip.example.com` in your
   .zuliprc.
 
   Every Zulip integration supports this sort of argument (or e.g. a
@@ -379,8 +419,8 @@ Maintaining Zulip in production
   precise configuration.
 
 
-SSO Authentication
-==================
+Remote User SSO Authentication
+==============================
 
 Zulip supports integrating with a corporate Single-Sign-On solution.
 There are a few ways to do it, but this section documents how to
@@ -412,5 +452,59 @@ place your completed configuration file at `/etc/apache2/sites-available/zulip-s
 
 (4) Run `a2ensite zulip-sso` to enable the Apache integration site.
 
-Now you should be able to visit `https://zulip.yourdomain.net/` and
+Now you should be able to visit `https://zulip.example.com/` and
 login via the SSO solution.
+
+
+### Troubleshooting Remote User SSO
+
+This system is a little finicky to networking setup (e.g. common
+issues have to do with /etc/hosts not mapping settings.EXTERNAL_HOST
+to the Apache listening on 127.0.0.1/localhost, for example).  It can
+often help while debugging to temporarily change the Apache config in
+/etc/apache2/sites-available/zulip-sso to listen on all interfaces
+rather than just 127.0.0.1 as you debug this.  It can also be helpful
+to change /etc/nginx/zulip-include/app.d/external-sso.conf to
+proxy_pass to a more explicit URL possibly not over HTTPS when
+debugging.  The following log files can be helpful when debugging this
+setup:
+
+* /var/log/zulip/{errors.log,server.log} (the usual places)
+* /var/log/nginx/access.log (nginx access logs)
+* /var/log/apache2/zulip_auth_access.log (you may want to change
+  LogLevel to "debug" in the apache config file to make this more
+  verbose)
+
+Here's a summary of how the remote user SSO system works assuming
+you're using HTTP basic auth; this summary should help with
+understanding what's going on as you try to debug:
+
+* Since you've configured /etc/zulip/settings.py to only define the
+  zproject.backends.ZulipRemoteUserBackend, zproject/settings.py
+  configures /accounts/login/sso as HOME_NOT_LOGGED_IN, which makes
+  `https://zulip.example.com/` aka the homepage for the main Zulip
+  Django app running behind nginx redirect to /accounts/login/sso if
+  you're not logged in.
+
+* nginx proxies requests to /accounts/login/sso/ to an Apache instance
+  listening on localhost:8888 apache via the config in
+  /etc/nginx/zulip-include/app.d/external-sso.conf (using the upstream
+  localhost:8888 defined in /etc/nginx/zulip-include/upstreams).
+
+* The Apache zulip-sso site which you've enabled listens on
+  localhost:8888 and presents the htpasswd dialogue; you provide
+  correct login information and the request reaches a second Zulip
+  Django app instance that is running behind Apache with with
+  REMOTE_USER set.  That request is served by
+  `zerver.views.remote_user_sso`, which just checks the REMOTE_USER
+  variable and either logs in (sets a cookie) or registers the new
+  user (depending whether they have an account).
+
+* After succeeding, that redirects the user back to / on port 443
+  (hosted by nginx); the main Zulip Django app sees the cookie and
+  proceeds to load the site homepage with them logged in (just as if
+  they'd logged in normally via username/password).
+
+Again, most issues with this setup tend to be subtle issues with the
+hostname/DNS side of the configuration.  Suggestions for how to
+improve this SSO setup documentation are very welcome!
