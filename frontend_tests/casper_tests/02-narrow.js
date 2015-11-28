@@ -126,17 +126,17 @@ function expect_all_pm() {
 }
 
 function check_narrow_title(title) {
-    // need to get title tag from HTML
-    // test if it's equal to some string passed in to function
-    casper.test.assertEquals($('title').text(),
-                             title,
-                             'Got expected narrow title');
+    return function () {
+        // need to get title tag from HTML
+        // test if it's equal to some string passed in to function
+        casper.test.assertSelectorHasText('title', title, 'Got expected narrow title');
+    };
 }
 
 function un_narrow() {
     casper.then(common.un_narrow);
     casper.then(expect_home);
-    check_narrow_title('home - Zulip Dev - Zulip');
+    casper.then(check_narrow_title('home - Zulip Dev - Zulip'));
 }
 
 // Narrow by clicking links.
@@ -149,6 +149,7 @@ common.wait_for_receive(function () {
 casper.waitUntilVisible('#zfilt', function () {
     expect_stream();
 });
+casper.then(check_narrow_title('Verona - Zulip Dev - Zulip'));
 un_narrow();
 
 casper.waitUntilVisible('#zhome', function () {
@@ -156,6 +157,7 @@ casper.waitUntilVisible('#zhome', function () {
     casper.test.info('Narrowing by clicking subject');
     casper.click('*[title="Narrow to stream \\\"Verona\\\", topic \\\"frontend test\\\""]');
 });
+casper.then(check_narrow_title('frontend test - Zulip Dev - Zulip'));
 
 casper.waitUntilVisible('#zfilt', function () {
     expect_stream_subject();
@@ -171,6 +173,7 @@ casper.waitUntilVisible('#zhome', function () {
     casper.click('*[title="Narrow to your private messages with Cordelia Lear, King Hamlet"]');
 });
 
+casper.then(check_narrow_title('private - Zulip Dev - Zulip'));
 
 casper.waitUntilVisible('#zfilt', function () {
     expect_huddle();
@@ -215,21 +218,29 @@ function do_search(str, item) {
 
 function search_and_check(str, item, check) {
     do_search(str, item);
-
     casper.then(check);
-    un_narrow();
 }
 
 casper.waitUntilVisible('#zhome', expect_home);
 
 // Test stream / recipient autocomplete in the search bar
 search_and_check('Verona',   'Narrow to stream',  expect_stream);
+casper.then(check_narrow_title('Verona - Zulip Dev - Zulip'));
+un_narrow();
 search_and_check('Cordelia', 'Narrow to private', expect_1on1);
+casper.then(check_narrow_title('private - Zulip Dev - Zulip'));
+un_narrow();
 
 // Test operators
-search_and_check('stream:verona',                       'Narrow', expect_stream);
-search_and_check('stream:verona subject:frontend+test', 'Narrow', expect_stream_subject);
-search_and_check('subject:frontend+test',               'Narrow', expect_subject);
+search_and_check('stream:Verona', 'Narrow', expect_stream);
+casper.then(check_narrow_title('Verona - Zulip Dev - Zulip'));
+un_narrow();
+search_and_check('stream:Verona subject:frontend+test', 'Narrow', expect_stream_subject);
+casper.then(check_narrow_title('frontend test - Zulip Dev - Zulip'));
+un_narrow();
+search_and_check('subject:frontend+test', 'Narrow', expect_subject);
+casper.then(check_narrow_title('home - Zulip Dev - Zulip'));
+un_narrow();
 
 
 // Narrow by clicking the left sidebar.
@@ -237,8 +248,11 @@ casper.then(function () {
     casper.test.info('Narrowing with left sidebar');
 });
 casper.thenClick('#stream_filters [data-name="Verona"]  a', expect_stream);
+casper.then(check_narrow_title('Verona - Zulip Dev - Zulip'));
 casper.thenClick('#global_filters [data-name="home"]    a', expect_home);
+casper.then(check_narrow_title('home - Zulip Dev - Zulip'));
 casper.thenClick('#global_filters [data-name="private"] a', expect_all_pm);
+casper.then(check_narrow_title('private - Zulip Dev - Zulip'));
 un_narrow();
 
 

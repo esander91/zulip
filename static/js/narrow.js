@@ -137,6 +137,7 @@ function report_unnarrow_time() {
     unnarrow_times = {};
 }
 
+exports.narrow_title = "home";
 exports.activate = function (raw_operators, opts) {
     var start_time = new Date();
     var was_narrowed_already = exports.active();
@@ -161,7 +162,10 @@ exports.activate = function (raw_operators, opts) {
         }
     } else if (filter.has_operator("is")) {
         exports.narrow_title = operators[0].operand;
+    } else if (filter.has_operator("pm-with")) {
+        exports.narrow_title = "private";
     }
+
     notifications.redraw_title();
 
     blueslip.debug("Narrowed", {operators: _.map(operators,
