@@ -125,11 +125,19 @@ function expect_all_pm() {
     ]);
 }
 
+function check_narrow_title(title) {
+    // need to get title tag from HTML
+    // test if it's equal to some string passed in to function
+    casper.test.assertEquals($('title').text(),
+                             title,
+                             'Got expected narrow title');
+}
+
 function un_narrow() {
     casper.then(common.un_narrow);
     casper.then(expect_home);
+    check_narrow_title('home - Zulip Dev - Zulip');
 }
-
 
 // Narrow by clicking links.
 

@@ -155,12 +155,12 @@ exports.activate = function (raw_operators, opts) {
     // "is", we shouldn't update the narrow title
     if (filter.has_operator("stream")) {
         if (filter.has_operator("topic")) {
-            page_params.narrow_title = operators[1].operand;
+            exports.narrow_title = operators[1].operand;
         } else {
-            page_params.narrow_title = operators[0].operand;
+            exports.narrow_title = operators[0].operand;
         }
     } else if (filter.has_operator("is")) {
-        page_params.narrow_title = operators[0].operand;
+        exports.narrow_title = operators[0].operand;
     }
     notifications.redraw_title();
 
@@ -491,7 +491,7 @@ exports.deactivate = function () {
 
     $(document).trigger($.Event('narrow_deactivated.zulip', {msg_list: current_msg_list}));
 
-    page_params.narrow_title = "home";
+    exports.narrow_title = "home";
     notifications.redraw_title();
 
     unnarrow_times.initial_core_time = new Date();
